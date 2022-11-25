@@ -8,7 +8,7 @@ import net.runelite.api.ItemID;
 @Getter
 public enum FoodType
 {
-	TUNA("tuna", ItemID.TUNA, "eat"),
+	TUNA("Tuna", ItemID.TUNA, "Eat"),
 	;
 
 	private String name;
