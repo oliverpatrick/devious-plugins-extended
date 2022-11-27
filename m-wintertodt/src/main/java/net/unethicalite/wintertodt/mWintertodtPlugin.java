@@ -26,6 +26,7 @@ package net.unethicalite.wintertodt;
 
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.AnimationID;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemID;
@@ -140,7 +141,7 @@ public class mWintertodtPlugin extends LoopedPlugin
 
     private enum State
     {
-        BANK, ENTER_WINTERTODT, EAT_FOOD, CUT_TREE, FLETCH_LOGS, LIT_BRAZIER, FEED_BRAZIER, LEAVE_WINTERTODT, SLEEP
+        BANK, ENTER_WINTERTODT, EAT_FOOD, CUT_TREE, FLETCH_LOGS, FIX_BRAZIER, LIT_BRAZIER, FEED_BRAZIER, LEAVE_WINTERTODT, SLEEP
     };
 
     private State getState()
@@ -176,20 +177,22 @@ public class mWintertodtPlugin extends LoopedPlugin
         {
             if (isGameStarted())
             {
+                TileObject brokenBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Fix"));
                 TileObject unlitBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Light"));
-                if (unlitBrazier != null && client.getLocalPlayer().distanceTo(unlitBrazier) <= 3)
+                TileObject burningBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Feed") || obj.getName().startsWith("Burning brazier"));
+                if (brokenBrazier != null && client.getLocalPlayer().distanceTo(brokenBrazier) <= 4)
+                {
+                    return State.FIX_BRAZIER;
+                }
+                else if (unlitBrazier != null && client.getLocalPlayer().distanceTo(unlitBrazier) <= 4)
                 {
                     return State.LIT_BRAZIER;
                 }
-                else if (Inventory.contains(ItemID.BRUMA_KINDLING))
+                else if (Inventory.getCount(ItemID.BRUMA_KINDLING) >= 8 || Inventory.contains(ItemID.BRUMA_KINDLING) && burningBrazier != null && client.getLocalPlayer().distanceTo(burningBrazier.getWorldLocation()) <= 4)
                 {
-                    TileObject brazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Feed") || obj.getName().startsWith("Burning brazier"));
-                    if (Inventory.getCount(ItemID.BRUMA_KINDLING) >= 8 || brazier != null && client.getLocalPlayer().distanceTo(brazier.getWorldLocation()) <= 3)
-                    {
                         return State.FEED_BRAZIER;
-                    }
                 }
-                else if (Inventory.getCount(ItemID.BRUMA_ROOT) > 8)
+                else if (Inventory.contains(ItemID.BRUMA_ROOT))
                 {
                     return State.FLETCH_LOGS;
                 }
@@ -243,11 +246,20 @@ public class mWintertodtPlugin extends LoopedPlugin
             case FLETCH_LOGS:
                 fletchLogs();
                 break;
+            case FIX_BRAZIER:
+                TileObject brokenBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Fix"));
+                if (brokenBrazier != null)
+                {
+                    brokenBrazier.interact("Fix");
+                    sleepUntil(() -> brokenBrazier == null, 3000);
+                }
+                break;
             case LIT_BRAZIER:
                 TileObject unlitBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Light"));
                 if (unlitBrazier != null)
                 {
                     unlitBrazier.interact("Light");
+                    sleepUntil(() -> unlitBrazier == null, 3000);
                 }
                 break;
             case FEED_BRAZIER:
@@ -259,31 +271,37 @@ public class mWintertodtPlugin extends LoopedPlugin
             case SLEEP:
                 return 1000;
         }
-        return 100;
+        return 50;
     }
 
     private void bank()
     {
         TileObject bank = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Bank") || obj.getName().startsWith("Collect"));
-        if (bank != null)
+
+        if (Bank.isOpen())
+        {
+            sleep(1000);
+            Bank.depositAllExcept(item -> item != null && item.getName().equals(config.foodType().getName()) || item.getName().endsWith("axe") || item.getName().equals("Knife") || item.getName().equals("Hammer") || item.getName().equals("Tinderbox"));
+            sleep(1500);
+            if (Bank.Inventory.getFirst(config.foodType().getId()) == null)
+            {
+                reset();
+                return;
+            }
+            Bank.withdraw(config.foodType().getId(), config.foodAmount() - Inventory.getCount(config.foodType().getId()), Bank.WithdrawMode.ITEM);
+            sleep(1000);
+            sleepUntil(() -> Inventory.getCount(config.foodType().getId()) == config.foodAmount(), 3000);
+            Bank.close();
+        }
+        else if (bank != null)
         {
             bank.interact("Bank");
-            sleepUntil(() -> Bank.isOpen(), 2000);
-            if (Bank.isOpen())
-            {
-               sleep(1500);
-               Bank.depositAllExcept(item -> item != null && item.getName().endsWith("axe") || item.getName().equals("Knife") || item.getName().equals("Hammer") || item.getName().equals("Tinderbox"));
-               sleep(1500);
-               sleepUntil(() -> Inventory.getFreeSlots() >= 24, 5000);
-               Bank.withdraw(config.foodType().getId(), config.foodAmount(), Bank.WithdrawMode.ITEM);
-               sleepUntil(() -> Inventory.getCount(config.foodType().getId()) == config.foodAmount(), 3000);
-               Bank.close();
-            }
+            sleepUntil(() -> Bank.isOpen(), 1000);
         }
         else
         {
             Walker.walkTo(new WorldPoint(1640, 3944, 0));
-            sleepUntil(() -> bank != null, 1000);
+            sleepUntil(() -> bank != null, 800);
         }
     }
 
@@ -328,7 +346,7 @@ public class mWintertodtPlugin extends LoopedPlugin
             else
             {
                 Walker.walkTo(new WorldPoint(631, 3969, 0));
-                sleepUntil(() -> door != null, 1000);
+                sleepUntil(() -> door != null, 800);
             }
         }
     }
@@ -345,17 +363,20 @@ public class mWintertodtPlugin extends LoopedPlugin
             else
             {
                 Walker.walkTo(config.brazierLocation().getWorldPoint());
-                sleepUntil(() -> tree != null, 1000);
+                sleepUntil(() -> tree != null, 800);
             }
         }
     }
 
     private void fletchLogs()
     {
-        if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
+        int anim = client.getLocalPlayer().getAnimation();
+        if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion()
+                || Inventory.getCount(ItemID.BRUMA_ROOT) >= 8 && anim != AnimationID.FLETCHING_BOW_CUTTING)
         {
             Inventory.getFirst(ItemID.KNIFE).useOn(Inventory.getFirst(ItemID.BRUMA_ROOT));
-            sleepUntil(() -> !Inventory.contains(ItemID.BRUMA_ROOT), 5500);
+            sleep(200);
+            sleepUntil(() -> !Inventory.contains(ItemID.BRUMA_ROOT) || anim != AnimationID.FLETCHING_BOW_CUTTING, 5500);
         }
     }
 
@@ -365,14 +386,16 @@ public class mWintertodtPlugin extends LoopedPlugin
         if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
         {
             brazier.interact("Feed");
-            sleepUntil(() -> !Inventory.contains(ItemID.BRUMA_KINDLING), 5500);
+            sleep(200);
+            int anim = client.getLocalPlayer().getAnimation();
+            sleepUntil(() -> brazier == null || !Inventory.contains(ItemID.BRUMA_KINDLING) || anim != AnimationID.LOOKING_INTO, 5500);
         }
     }
 
     /**
      * Sleep until condition is met or timeout is reached
      *
-     * @param condition the condition to sleep for until becoming valid
+     * @param condition, the condition to sleep for until becoming valid
      * @param timeout, the timeout in millis
      */
     private void sleepUntil(BooleanSupplier condition, long timeout)
