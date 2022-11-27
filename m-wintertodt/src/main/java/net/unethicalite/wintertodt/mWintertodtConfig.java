@@ -26,14 +26,25 @@ public interface mWintertodtConfig extends Config
         return BrazierLocation.EAST;
     }
 
+    @ConfigItem(keyName = "Max resources", name = "Max resources", description = "Max amount of Bruma kindling/roots", position = 4)
+    default int maxResources()
+    {
+        return 8;
+    }
 
-    @ConfigItem(keyName = "Destination level", name = "Destination level", description = "Stop when level is reached", position = 4)
+    @ConfigItem(keyName = "Destination level", name = "Destination level", description = "Stop when level is reached", position = 5)
     default int destinationLevel()
     {
         return 99;
     }
 
-    @ConfigItem(keyName = "Start", name = "Start/Stop", description = "Start/Stop button", position = 5)
+    @ConfigItem(keyName = "Overlay enabled", name = "Overlay enabled", description = "Enables overlay", position = 6)
+    default boolean overlayEnabled()
+    {
+        return true;
+    }
+
+    @ConfigItem(keyName = "Start", name = "Start/Stop", description = "Start/Stop button", position = 7)
     default Button startStopButton()
     {
         return new Button();

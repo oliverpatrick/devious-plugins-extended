@@ -25,21 +25,27 @@
 package net.unethicalite.wintertodt;
 
 import com.google.inject.Provides;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.AnimationID;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemID;
 import net.runelite.api.MenuAction;
+import net.runelite.api.MessageNode;
 import net.runelite.api.Skill;
 import net.runelite.api.TileObject;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ConfigButtonClicked;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.unethicalite.api.entities.TileObjects;
 import net.unethicalite.api.items.Bank;
 import net.unethicalite.api.items.Inventory;
@@ -50,7 +56,9 @@ import org.pf4j.Extension;
 import java.time.Instant;
 import java.util.function.BooleanSupplier;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
+@Singleton
 @Extension
 @PluginDescriptor(
         name = "mWintertodt",
@@ -74,6 +82,12 @@ public class mWintertodtPlugin extends LoopedPlugin
     private Client client;
 
     @Inject
+    private OverlayManager overlayManager;
+
+    @Inject
+    private mWintertodtOverlay mWintertodtOverlay;
+
+    @Inject
     private mWintertodtConfig config;
 
     @Provides
@@ -82,17 +96,32 @@ public class mWintertodtPlugin extends LoopedPlugin
         return configManager.getConfig(mWintertodtConfig.class);
     }
 
+    @Getter(AccessLevel.PACKAGE)
+    private State state;
+
+    @Getter(AccessLevel.PACKAGE)
+    private int lost;
+
+    @Getter(AccessLevel.PACKAGE)
+    private int won;
+
+    @Getter(AccessLevel.PACKAGE)
+    private int timeRunning;
+
+    @Getter(AccessLevel.PACKAGE)
     private boolean scriptStarted;
 
     @Override
     protected void startUp()
     {
+        this.overlayManager.add(mWintertodtOverlay);
     }
 
     @Override
     protected void shutDown()
     {
         reset();
+        this.overlayManager.remove(mWintertodtOverlay);
     }
 
     /**
@@ -100,6 +129,9 @@ public class mWintertodtPlugin extends LoopedPlugin
      */
     private void reset()
     {
+        this.lost = 0;
+        this.won = 0;
+        this.timeRunning = 0;
         this.scriptStarted = false;
     }
 
@@ -119,6 +151,33 @@ public class mWintertodtPlugin extends LoopedPlugin
             {
                 this.scriptStarted = true;
             }
+    }
+
+    @Subscribe
+    public void onChatMessage(ChatMessage chatMessage)
+    {
+        if (!isInWintertodtRegion())
+        {
+            return;
+        }
+
+        ChatMessageType chatMessageType = chatMessage.getType();
+
+        if (chatMessageType != ChatMessageType.GAMEMESSAGE && chatMessageType != ChatMessageType.SPAM)
+        {
+            return;
+        }
+
+        MessageNode messageNode = chatMessage.getMessageNode();
+        if (messageNode.getValue().startsWith("You did not earn enough points"))
+        {
+            lost++;
+        }
+
+        if (messageNode.getValue().startsWith("You have gained a supply crate"))
+        {
+            won++;
+        }
     }
 
     private boolean isInWintertodtRegion()
@@ -188,7 +247,7 @@ public class mWintertodtPlugin extends LoopedPlugin
                 {
                     return State.LIT_BRAZIER;
                 }
-                else if (Inventory.getCount(ItemID.BRUMA_KINDLING) >= 8 || Inventory.contains(ItemID.BRUMA_KINDLING) && burningBrazier != null && client.getLocalPlayer().distanceTo(burningBrazier.getWorldLocation()) <= 4)
+                else if (Inventory.getCount(ItemID.BRUMA_KINDLING) >= config.maxResources() || Inventory.contains(ItemID.BRUMA_KINDLING) && burningBrazier != null && client.getLocalPlayer().distanceTo(burningBrazier.getWorldLocation()) <= 4)
                 {
                         return State.FEED_BRAZIER;
                 }
@@ -223,29 +282,94 @@ public class mWintertodtPlugin extends LoopedPlugin
         {
             if (scriptStarted)
             {
-                reset();
+                scriptStarted = false;
             }
             return -1;
         }
 
-        switch (getState())
+        state = getState();
+        log.info("Wintertodt state: {}", state.name());
+
+        switch (state)
         {
             case BANK:
-                bank();
+                TileObject bank = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Bank") || obj.getName().startsWith("Collect"));
+                if (Bank.isOpen())
+                {
+                    sleep(1000);
+                    Bank.depositAllExcept(item -> item != null && item.getName().equals(config.foodType().getName()) || item.getName().endsWith("axe") || item.getName().equals("Knife") || item.getName().equals("Hammer") || item.getName().equals("Tinderbox"));
+                    sleep(1500);
+                    if (Bank.Inventory.getFirst(config.foodType().getId()) == null)
+                    {
+                        reset();
+                        return -1;
+                    }
+                    Bank.withdraw(config.foodType().getId(), config.foodAmount() - Inventory.getCount(config.foodType().getId()), Bank.WithdrawMode.ITEM);
+                    sleep(1500);
+                    sleepUntil(() -> Inventory.getCount(config.foodType().getId()) == config.foodAmount(), 3000);
+                    Bank.close();
+                }
+                else if (bank != null)
+                {
+                    bank.interact("Bank");
+                    sleepUntil(() -> Bank.isOpen(), 1000);
+                }
+                else
+                {
+                    Walker.walkTo(new WorldPoint(1640, 3944, 0));
+                    sleepUntil(() -> bank != null, 800);
+                }
                 break;
+
             case ENTER_WINTERTODT:
-                enterWintertodt();
+                if (!isInWintertodtRegion())
+                {
+                    Walker.walkTo(new WorldPoint(1630, 3962, 0));
+                    TileObject door = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.getName().startsWith("Door") && obj.hasAction("Enter"));
+                    sleepUntil(() -> door != null, 1000);
+
+                    if (door != null)
+                    {
+                        door.interact("Enter");
+                        sleepUntil(this::isInWintertodtRegion, 5000);
+                    }
+                }
+
+                sleep(2000);
+                Walker.walkTo(config.brazierLocation().getWorldPoint());
                 break;
+
             case EAT_FOOD:
                 FoodType foodType = config.foodType();
                 Inventory.getFirst(foodType.getId()).interact(foodType.getAction());
                 break;
+
             case CUT_TREE:
-                cutTree();
+                if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
+                {
+                    TileObject tree = TileObjects.getFirstSurrounding(config.brazierLocation().getWorldPoint(), 10, obj -> obj.hasAction("Chop") || obj.getName().startsWith("Bruma roots"));
+                    if (tree != null)
+                    {
+                        tree.interact("Chop");
+                    }
+                    else
+                    {
+                        Walker.walkTo(config.brazierLocation().getWorldPoint());
+                        sleepUntil(() -> tree != null, 800);
+                    }
+                }
                 break;
+
             case FLETCH_LOGS:
-                fletchLogs();
+                if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion()
+                        || Inventory.getCount(ItemID.BRUMA_ROOT) >= config.maxResources() && client.getLocalPlayer().getAnimation() != AnimationID.FLETCHING_BOW_CUTTING)
+                {
+                    Inventory.getFirst(ItemID.KNIFE).useOn(Inventory.getFirst(ItemID.BRUMA_ROOT));
+                    sleep(500);
+                    sleepUntil(() -> !Inventory.contains(ItemID.BRUMA_ROOT) || client.getLocalPlayer().getAnimation() != AnimationID.FLETCHING_BOW_CUTTING, 5500);
+                }
                 break;
+
             case FIX_BRAZIER:
                 TileObject brokenBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Fix"));
                 if (brokenBrazier != null)
@@ -254,6 +378,7 @@ public class mWintertodtPlugin extends LoopedPlugin
                     sleepUntil(() -> brokenBrazier == null, 3000);
                 }
                 break;
+
             case LIT_BRAZIER:
                 TileObject unlitBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Light"));
                 if (unlitBrazier != null)
@@ -262,134 +387,44 @@ public class mWintertodtPlugin extends LoopedPlugin
                     sleepUntil(() -> unlitBrazier == null, 3000);
                 }
                 break;
+
             case FEED_BRAZIER:
-                feedBrazier();
+                TileObject burningBrazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Feed") || obj.getName().startsWith("Burning brazier"));
+                if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
+                {
+                    burningBrazier.interact("Feed");
+                    sleep(500);
+                    sleepUntil(() -> burningBrazier == null || !Inventory.contains(ItemID.BRUMA_KINDLING), 5500);
+                }
                 break;
+
             case LEAVE_WINTERTODT:
-                leaveWintertodt();
+                if (isInWintertodtRegion())
+                {
+                    TileObject door = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.getName().startsWith("Door") && obj.hasAction("Enter"));
+                    if (door != null)
+                    {
+                        door.interact("Enter");
+                        Widget skipDialog =  Widgets.get(WidgetInfo.DIALOG_OPTION_OPTION1);
+                        sleepUntil(() -> !isInWintertodtRegion() || skipDialog != null && skipDialog.isVisible(), 5000);
+                        if (skipDialog != null && skipDialog.isVisible())
+                        {
+                            skipDialog.interact(MenuAction.WIDGET_CONTINUE.getId());
+                            sleepUntil(() -> !isInWintertodtRegion(), 1000);
+                        }
+                    }
+                    else
+                    {
+                        Walker.walkTo(new WorldPoint(631, 3969, 0));
+                        sleepUntil(() -> door != null, 800);
+                    }
+                }
                 break;
+
             case SLEEP:
                 return 1000;
         }
-        return 50;
-    }
-
-    private void bank()
-    {
-        TileObject bank = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Bank") || obj.getName().startsWith("Collect"));
-
-        if (Bank.isOpen())
-        {
-            sleep(1000);
-            Bank.depositAllExcept(item -> item != null && item.getName().equals(config.foodType().getName()) || item.getName().endsWith("axe") || item.getName().equals("Knife") || item.getName().equals("Hammer") || item.getName().equals("Tinderbox"));
-            sleep(1500);
-            if (Bank.Inventory.getFirst(config.foodType().getId()) == null)
-            {
-                reset();
-                return;
-            }
-            Bank.withdraw(config.foodType().getId(), config.foodAmount() - Inventory.getCount(config.foodType().getId()), Bank.WithdrawMode.ITEM);
-            sleep(1000);
-            sleepUntil(() -> Inventory.getCount(config.foodType().getId()) == config.foodAmount(), 3000);
-            Bank.close();
-        }
-        else if (bank != null)
-        {
-            bank.interact("Bank");
-            sleepUntil(() -> Bank.isOpen(), 1000);
-        }
-        else
-        {
-            Walker.walkTo(new WorldPoint(1640, 3944, 0));
-            sleepUntil(() -> bank != null, 800);
-        }
-    }
-
-    private void enterWintertodt()
-    {
-        if (!isInWintertodtRegion())
-        {
-            Walker.walkTo(new WorldPoint(1630, 3962, 0));
-            TileObject door = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.getName().startsWith("Door") && obj.hasAction("Enter"));
-            sleepUntil(() -> door != null, 1000);
-
-            if (door != null)
-            {
-                door.interact("Enter");
-                sleepUntil(this::isInWintertodtRegion, 5000);
-            }
-        }
-
-        sleep(2000);
-        Walker.walkTo(config.brazierLocation().getWorldPoint());
-    }
-
-    /**
-     * Leave wintertodt area method
-     */
-    private void leaveWintertodt()
-    {
-        if (isInWintertodtRegion())
-        {
-            TileObject door = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.getName().startsWith("Door") && obj.hasAction("Enter"));
-            if (door != null)
-            {
-                door.interact("Enter");
-                Widget skipDialog =  Widgets.get(WidgetInfo.DIALOG_OPTION_OPTION1);
-                sleepUntil(() -> !isInWintertodtRegion() || skipDialog != null && skipDialog.isVisible(), 5000);
-                if (skipDialog != null && skipDialog.isVisible())
-                {
-                    skipDialog.interact(MenuAction.WIDGET_CONTINUE.getId());
-                    sleepUntil(() -> !isInWintertodtRegion(), 1000);
-                }
-            }
-            else
-            {
-                Walker.walkTo(new WorldPoint(631, 3969, 0));
-                sleepUntil(() -> door != null, 800);
-            }
-        }
-    }
-
-    private void cutTree()
-    {
-        if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
-        {
-            TileObject tree = TileObjects.getFirstSurrounding(config.brazierLocation().getWorldPoint(), 10, obj -> obj.hasAction("Chop") || obj.getName().startsWith("Bruma roots"));
-            if (tree != null)
-            {
-                tree.interact("Chop");
-            }
-            else
-            {
-                Walker.walkTo(config.brazierLocation().getWorldPoint());
-                sleepUntil(() -> tree != null, 800);
-            }
-        }
-    }
-
-    private void fletchLogs()
-    {
-        int anim = client.getLocalPlayer().getAnimation();
-        if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion()
-                || Inventory.getCount(ItemID.BRUMA_ROOT) >= 8 && anim != AnimationID.FLETCHING_BOW_CUTTING)
-        {
-            Inventory.getFirst(ItemID.KNIFE).useOn(Inventory.getFirst(ItemID.BRUMA_ROOT));
-            sleep(200);
-            sleepUntil(() -> !Inventory.contains(ItemID.BRUMA_ROOT) || anim != AnimationID.FLETCHING_BOW_CUTTING, 5500);
-        }
-    }
-
-    private void feedBrazier()
-    {
-        TileObject brazier = TileObjects.getFirstSurrounding(client.getLocalPlayer().getWorldLocation(), 10, obj -> obj.hasAction("Feed") || obj.getName().startsWith("Burning brazier"));
-        if (!client.getLocalPlayer().isAnimating() && isInWintertodtRegion())
-        {
-            brazier.interact("Feed");
-            sleep(200);
-            int anim = client.getLocalPlayer().getAnimation();
-            sleepUntil(() -> brazier == null || !Inventory.contains(ItemID.BRUMA_KINDLING) || anim != AnimationID.LOOKING_INTO, 5500);
-        }
+        return 100;
     }
 
     /**
