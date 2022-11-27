@@ -31,9 +31,10 @@ public class mWintertodtOverlay extends Overlay
 		if (plugin.isScriptStarted() && config.overlayEnabled())
 		{
 			graphics.setColor(Color.RED);
-			graphics.drawString("Time running: " + plugin.getTimeRunning(), 10, 175);
-			graphics.drawString("Games won: " + plugin.getWon(), 10, 190);
-			graphics.drawString("Games lost: " + plugin.getLost(), 10, 205);
+			graphics.drawString("Time running: " + plugin.getTimeRunning(), 10, 190);
+			graphics.drawString("State: " + plugin.getCurrentState(), 10, 205);
+			graphics.drawString("Games won: " + plugin.getWon(), 10, 220);
+			graphics.drawString("Games lost: " + plugin.getLost(), 10, 235);
 		}
 		return null;
 	}
