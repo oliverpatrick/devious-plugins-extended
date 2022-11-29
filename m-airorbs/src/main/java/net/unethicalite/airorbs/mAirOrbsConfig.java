@@ -22,25 +22,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package net.unethicalite.autoswitcher;
+package net.unethicalite.airorbs;
 
+import net.runelite.client.config.Button;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
-import java.awt.event.KeyEvent;
 
-@ConfigGroup("autoswitcher")
-public interface AutoSwitcherConfig extends Config
+@ConfigGroup("airorbs")
+public interface mAirOrbsConfig extends Config
 {
-    @ConfigItem(keyName = "hot key", name = "hot key", description = "hot key", position = 1)
-    default String hotKey()
+    @ConfigItem(keyName = "Overlay enabled", name = "Overlay enabled", description = "Enables overlay", position = 1)
+    default boolean overlayEnabled()
     {
-        return KeyEvent.getKeyText(KeyEvent.VK_F10);
+        return true;
     }
 
-    @ConfigItem(keyName = "gear set", name = "gear set", description = "Set of gear", position = 2)
-    default String gearSet()
+    @ConfigItem(keyName = "Start", name = "Start/Stop", description = "Start/Stop button", position = 2)
+    default Button startStopButton()
     {
-        return "Item1,Item2";
+        return new Button();
     }
 }
