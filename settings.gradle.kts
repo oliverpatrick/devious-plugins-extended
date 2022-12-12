@@ -55,6 +55,7 @@ include("unethical-logout")
 include("m-autoswitcher")
 include("m-powerfisher")
 include("m-wintertodt")
+include("m-winemaker")
 
 //include("example-kotlin")
 
