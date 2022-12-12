@@ -36,11 +36,8 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemID;
-import net.runelite.api.MessageNode;
 import net.runelite.api.Player;
-import net.runelite.api.Skill;
 import net.runelite.api.TileObject;
-import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.ConfigButtonClicked;
 import net.runelite.api.widgets.Widget;
@@ -54,7 +51,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.unethicalite.api.entities.TileObjects;
-import net.unethicalite.api.events.ExperienceGained;
+import net.unethicalite.api.events.InventoryChanged;
 import net.unethicalite.api.items.Bank;
 import net.unethicalite.api.items.Inventory;
 import net.unethicalite.api.plugins.LoopedPlugin;
@@ -104,6 +101,9 @@ public class mWineMakerPlugin extends LoopedPlugin
 	private State currentState;
 
 	@Getter(AccessLevel.PACKAGE)
+	private int winesMade;
+
+	@Getter(AccessLevel.PACKAGE)
 	private int timesBanked;
 
 	@Getter(AccessLevel.PACKAGE)
@@ -134,6 +134,7 @@ public class mWineMakerPlugin extends LoopedPlugin
 	 */
 	private void reset()
 	{
+		this.winesMade = 0;
 		this.timesBanked = 0;
 		this.currentState = null;
 		this.scriptStartTime = null;
@@ -160,29 +161,6 @@ public class mWineMakerPlugin extends LoopedPlugin
 		}
 	}
 
-	@Subscribe
-	public void onChatMessage(ChatMessage chatMessage)
-	{
-		ChatMessageType chatMessageType = chatMessage.getType();
-		MessageNode messageNode = chatMessage.getMessageNode();
-
-		if (!scriptStarted
-			|| chatMessageType != ChatMessageType.GAMEMESSAGE
-			&& chatMessageType != ChatMessageType.SPAM)
-		{
-			return;
-		}
-
-		/*if (messageNode.getValue().startsWith("The brazier is broken and shrapnel"))
-		{
-			if (config.fixBrokenBrazier()
-				&& Inventory.contains(ItemID.HAMMER))
-			{
-				this.currentState = State.FIX_BRAZIER;
-			}
-		}*/
-	}
-
 	/**
 	 * Broadcast a chat message
 	 *
@@ -204,16 +182,17 @@ public class mWineMakerPlugin extends LoopedPlugin
 	}
 
 	@Subscribe
-	public void onExperienceGained(ExperienceGained event)
+	public void onInventoryChanged(InventoryChanged event)
 	{
 		if (!scriptStarted)
 		{
 			return;
 		}
 
-		if (event.getSkill() == Skill.COOKING)
+		if (event.getItemId() == ItemID.UNFERMENTED_WINE
+			&& event.getChangeType() == InventoryChanged.ChangeType.ITEM_ADDED)
 		{
-			// ?
+			winesMade++;
 		}
 	}
 
@@ -225,6 +204,7 @@ public class mWineMakerPlugin extends LoopedPlugin
 			return;
 		}
 
+		// Continue widget
 		Widget w = client.getWidget(WidgetInfo.MULTI_SKILL_MENU);
 		if (w != null && w.isVisible())
 		{
@@ -240,8 +220,6 @@ public class mWineMakerPlugin extends LoopedPlugin
 
 	private State getState()
 	{
-		//final Player localPlayer = client.getLocalPlayer();
-
 		if (!Inventory.contains(ItemID.GRAPES)
 			|| !Inventory.contains(ItemID.JUG_OF_WATER))
 		{
@@ -268,7 +246,7 @@ public class mWineMakerPlugin extends LoopedPlugin
 		switch (currentState)
 		{
 			case BANK:
-				TileObject bank = TileObjects.getFirstSurrounding(localPlayer.getWorldLocation(), 10, obj -> obj.hasAction("Bank") || obj.getName().startsWith("Collect"));
+				TileObject bank = TileObjects.getFirstSurrounding(localPlayer.getWorldLocation(), 10, obj -> obj.hasAction("Bank") || obj.getName().startsWith("Collect") || obj.getName().startsWith("Bank"));
 				if (Bank.isOpen())
 				{
 					sleep(1000);
@@ -284,14 +262,18 @@ public class mWineMakerPlugin extends LoopedPlugin
 					}
 
 					Bank.withdraw(ItemID.GRAPES, 14, Bank.WithdrawMode.ITEM);
-					Bank.withdraw(ItemID.JUG_OF_WINE, 14, Bank.WithdrawMode.ITEM);
+					sleepUntil(() -> Inventory.getCount(ItemID.GRAPES) == 14, 2000);
+
+					Bank.withdraw(ItemID.JUG_OF_WATER, 14, Bank.WithdrawMode.ITEM);
+					sleepUntil(() -> Inventory.getCount(ItemID.JUG_OF_WATER) == 14, 2000);
+
 					Bank.close();
 					timesBanked++;
 				}
 				else if (bank != null)
 				{
-					bank.interact("Bank", "Use");
-					sleepUntil(() -> Bank.isOpen(), 1000);
+					bank.interact(action -> action != null && (action.contains("Bank") || action.contains("Use")));
+					sleepUntil(() -> Bank.isOpen(), 2000);
 				}
 				return -1;
 

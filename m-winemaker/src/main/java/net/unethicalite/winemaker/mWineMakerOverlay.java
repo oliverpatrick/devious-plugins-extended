@@ -48,7 +48,7 @@ public class mWineMakerOverlay extends OverlayPanel
 				.build());
 
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left("Wines made: " + plugin.getTimesBanked())
+				.left("Wines made: " + plugin.getWinesMade())
 				.leftColor(Color.GREEN)
 				.build());
 
