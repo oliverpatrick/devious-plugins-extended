@@ -56,6 +56,7 @@ rootProject.name = "unethicalite-plugins"
 //include("m-powerfisher")
 //include("m-wintertodt")
 include("m-winemaker")
+include("m-superheat")
 
 //include("example-kotlin")
 
