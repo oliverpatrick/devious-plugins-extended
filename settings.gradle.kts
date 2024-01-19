@@ -23,7 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-rootProject.name = "unethicalite-plugins"
+rootProject.name = "devious-plugins"
 
 //include("hoot-blackjack")
 //include("hoot-trawler")
