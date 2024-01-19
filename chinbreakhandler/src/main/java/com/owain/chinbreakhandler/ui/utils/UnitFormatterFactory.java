@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Owain van Brakel <https:github.com/Owain94>
+ * Copyright (c) 2020, Hydrox6 <ikada@protonmail.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,49 +22,22 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.owain.chinbreakhandler.ui.utils;
 
-rootProject.name = "devious-plugins"
+import java.util.HashMap;
+import java.util.Map;
+import javax.swing.JFormattedTextField;
+import lombok.RequiredArgsConstructor;
 
-//include("hoot-blackjack")
-//include("hoot-trawler")
-//include("hoot-pickpocket")
-//include("hoot-aerialfishing")
-//include("hoot-chins")
-//include("hoot-notifier")
-//include("hoot-karambwanfisher")
+@RequiredArgsConstructor
+public final class UnitFormatterFactory extends JFormattedTextField.AbstractFormatterFactory
+{
+	private final String units;
+	private final Map<JFormattedTextField, JFormattedTextField.AbstractFormatter> formatters = new HashMap<>();
 
-include("hoot-tempoross")
-
-include("unethical-fighter")
-include("unethical-butler")
-include("unethical-birdhouses")
-include("unethical-kebab-buyer")
-include("unethical-autologin")
-include("unethical-oneclick")
-include("unethical-agility")
-include("unethical-prayer")
-include("unethical-explorer")
-include("unethical-chopper")
-include("unethical-zulrah")
-include("unethical-cooker")
-include("unethical-bankpin")
-include("unethical-tempoross")
-include("unethical-pickpocket")
-include("unethical-logout")
-
-include("m-autoswitcher")
-include("m-powerfisher")
-include("m-wintertodt")
-include("chinbreakhandler")
-
-//include("example-kotlin")
-
-for (project in rootProject.children) {
-    project.apply {
-        projectDir = file(name)
-        buildFileName = "$name.gradle.kts"
-
-        require(projectDir.isDirectory) { "Project '${project.path} must have a $projectDir directory" }
-        require(buildFile.isFile) { "Project '${project.path} must have a $buildFile build script" }
-    }
+	@Override
+	public JFormattedTextField.AbstractFormatter getFormatter(final JFormattedTextField tf)
+	{
+		return formatters.computeIfAbsent(tf, (key) -> new UnitFormatter(units));
+	}
 }

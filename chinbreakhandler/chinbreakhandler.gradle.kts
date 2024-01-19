@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Owain van Brakel <https:github.com/Owain94>
+ * Copyright (c) 2019 Owain van Brakel <https://github.com/Owain94>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,48 +23,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-rootProject.name = "devious-plugins"
+version = "2.3.0"
 
-//include("hoot-blackjack")
-//include("hoot-trawler")
-//include("hoot-pickpocket")
-//include("hoot-aerialfishing")
-//include("hoot-chins")
-//include("hoot-notifier")
-//include("hoot-karambwanfisher")
+project.extra["PluginName"] = "Chin break handler"
+project.extra["PluginDescription"] = "Automatically takes breaks for you (?)"
 
-include("hoot-tempoross")
+dependencies {
+    annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.20")
+    annotationProcessor(group = "org.pf4j", name = "pf4j", version = "3.6.0")
+    implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.14.0")
+    implementation(group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.8")
+}
 
-include("unethical-fighter")
-include("unethical-butler")
-include("unethical-birdhouses")
-include("unethical-kebab-buyer")
-include("unethical-autologin")
-include("unethical-oneclick")
-include("unethical-agility")
-include("unethical-prayer")
-include("unethical-explorer")
-include("unethical-chopper")
-include("unethical-zulrah")
-include("unethical-cooker")
-include("unethical-bankpin")
-include("unethical-tempoross")
-include("unethical-pickpocket")
-include("unethical-logout")
+tasks {
+    jar {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-include("m-autoswitcher")
-include("m-powerfisher")
-include("m-wintertodt")
-include("chinbreakhandler")
+        from(configurations.runtimeClasspath.get()
+                .map { if (it.isDirectory) it else zipTree(it) })
 
-//include("example-kotlin")
-
-for (project in rootProject.children) {
-    project.apply {
-        projectDir = file(name)
-        buildFileName = "$name.gradle.kts"
-
-        require(projectDir.isDirectory) { "Project '${project.path} must have a $projectDir directory" }
-        require(buildFile.isFile) { "Project '${project.path} must have a $buildFile build script" }
+        manifest {
+            attributes(mapOf(
+                    "Plugin-Version" to project.version,
+                    "Plugin-Id" to nameToId(project.extra["PluginName"] as String),
+                    "Plugin-Provider" to project.extra["PluginProvider"],
+                    "Plugin-Description" to project.extra["PluginDescription"],
+                    "Plugin-License" to project.extra["PluginLicense"]
+            ))
+        }
     }
 }

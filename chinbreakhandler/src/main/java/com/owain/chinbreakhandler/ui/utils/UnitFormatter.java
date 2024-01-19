@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Owain van Brakel <https:github.com/Owain94>
+ * Copyright (c) 2020, Hydrox6 <ikada@protonmail.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,49 +22,48 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.owain.chinbreakhandler.ui.utils;
 
-rootProject.name = "devious-plugins"
+import java.text.ParseException;
+import javax.swing.JFormattedTextField;
 
-//include("hoot-blackjack")
-//include("hoot-trawler")
-//include("hoot-pickpocket")
-//include("hoot-aerialfishing")
-//include("hoot-chins")
-//include("hoot-notifier")
-//include("hoot-karambwanfisher")
+final class UnitFormatter extends JFormattedTextField.AbstractFormatter
+{
+	private final String units;
 
-include("hoot-tempoross")
+	UnitFormatter(String units)
+	{
+		this.units = units;
+	}
 
-include("unethical-fighter")
-include("unethical-butler")
-include("unethical-birdhouses")
-include("unethical-kebab-buyer")
-include("unethical-autologin")
-include("unethical-oneclick")
-include("unethical-agility")
-include("unethical-prayer")
-include("unethical-explorer")
-include("unethical-chopper")
-include("unethical-zulrah")
-include("unethical-cooker")
-include("unethical-bankpin")
-include("unethical-tempoross")
-include("unethical-pickpocket")
-include("unethical-logout")
+	@Override
+	public Object stringToValue(final String text) throws ParseException
+	{
+		final String trimmedText;
 
-include("m-autoswitcher")
-include("m-powerfisher")
-include("m-wintertodt")
-include("chinbreakhandler")
+		// Using the spinner controls causes the value to have the unit on the end, so remove it
+		if (text.endsWith(units))
+		{
+			trimmedText = text.substring(0, text.length() - units.length());
+		}
+		else
+		{
+			trimmedText = text;
+		}
 
-//include("example-kotlin")
+		try
+		{
+			return Integer.valueOf(trimmedText);
+		}
+		catch (NumberFormatException e)
+		{
+			throw new ParseException(trimmedText + " is not an integer.", 0);
+		}
+	}
 
-for (project in rootProject.children) {
-    project.apply {
-        projectDir = file(name)
-        buildFileName = "$name.gradle.kts"
-
-        require(projectDir.isDirectory) { "Project '${project.path} must have a $projectDir directory" }
-        require(buildFile.isFile) { "Project '${project.path} must have a $buildFile build script" }
-    }
+	@Override
+	public String valueToString(final Object value)
+	{
+		return value + units;
+	}
 }

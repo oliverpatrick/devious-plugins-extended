@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019 Owain van Brakel <https:github.com/Owain94>
+ * Copyright (c) 2018, Adam <Adam@sigterm.info>
+ * Copyright (c) 2018, Dalton <delps1001@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,49 +23,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.owain.chinbreakhandler;
 
-rootProject.name = "devious-plugins"
+import static com.owain.chinbreakhandler.ChinBreakHandlerPlugin.CONFIG_GROUP;
+import net.runelite.client.config.Config;
+import net.runelite.client.config.ConfigGroup;
 
-//include("hoot-blackjack")
-//include("hoot-trawler")
-//include("hoot-pickpocket")
-//include("hoot-aerialfishing")
-//include("hoot-chins")
-//include("hoot-notifier")
-//include("hoot-karambwanfisher")
+@ConfigGroup(CONFIG_GROUP)
+public interface NullConfig extends Config
+{
 
-include("hoot-tempoross")
-
-include("unethical-fighter")
-include("unethical-butler")
-include("unethical-birdhouses")
-include("unethical-kebab-buyer")
-include("unethical-autologin")
-include("unethical-oneclick")
-include("unethical-agility")
-include("unethical-prayer")
-include("unethical-explorer")
-include("unethical-chopper")
-include("unethical-zulrah")
-include("unethical-cooker")
-include("unethical-bankpin")
-include("unethical-tempoross")
-include("unethical-pickpocket")
-include("unethical-logout")
-
-include("m-autoswitcher")
-include("m-powerfisher")
-include("m-wintertodt")
-include("chinbreakhandler")
-
-//include("example-kotlin")
-
-for (project in rootProject.children) {
-    project.apply {
-        projectDir = file(name)
-        buildFileName = "$name.gradle.kts"
-
-        require(projectDir.isDirectory) { "Project '${project.path} must have a $projectDir directory" }
-        require(buildFile.isFile) { "Project '${project.path} must have a $buildFile build script" }
-    }
 }
