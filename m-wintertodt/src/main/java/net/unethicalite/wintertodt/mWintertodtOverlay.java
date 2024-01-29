@@ -33,7 +33,7 @@ public class mWintertodtOverlay extends OverlayPanel
 		if (plugin.isScriptStarted() && config.overlayEnabled())
 		{
 			panelComponent.getChildren().add(TitleComponent.builder()
-				.text("mWintertodt")
+				.text("oWintertodt")
 				.color(Color.WHITE)
 				.build());
 
